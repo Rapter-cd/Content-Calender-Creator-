@@ -20,7 +20,7 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export default function ExportBar({ state, onRegenerate }: ExportBarProps) {
   const { brandConfig, calendarDays, dayPosts, generatedAt } = state;
-  const activeDays = calendarDays.filter(d => !d.is_rest_day).length;
+  const activeDays = (calendarDays || []).filter(d => !d.is_rest_day).length;
   const brandName = brandConfig?.brandName || 'My Brand';
 
   const handleExport = async (format: 'csv' | 'json') => {

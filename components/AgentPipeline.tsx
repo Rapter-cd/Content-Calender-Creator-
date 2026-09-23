@@ -20,7 +20,7 @@ export default function AgentPipeline({ state, onRetry }: AgentPipelineProps) {
         status === 'researching'
           ? `Scanning trending topics in ${brandConfig?.niche || 'your niche'}...`
           : agentProgress.trends === 'done'
-          ? `Found ${trends.length} trending topics`
+          ? `Found ${trends?.length || 0} trending topics`
           : 'Identifies 15 viral topics for your niche',
       status: agentProgress.trends,
     },
@@ -29,7 +29,7 @@ export default function AgentPipeline({ state, onRetry }: AgentPipelineProps) {
       emoji: '📋',
       description:
         status === 'planning'
-          ? `Mapping ${trends.length} trends to a 30-day schedule...`
+          ? `Mapping ${trends?.length || 0} trends to a 30-day schedule...`
           : agentProgress.planner === 'done'
           ? 'Created your 30-day content roadmap'
           : 'Maps trends to a 30-day posting schedule',

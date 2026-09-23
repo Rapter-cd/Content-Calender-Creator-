@@ -77,21 +77,23 @@ RULES:
 - Hooks must be attention-grabbing and specific to the content idea
 - Vary content types — no 3 days of the same type in a row
 
-RETURN THIS EXACT JSON STRUCTURE (array of exactly 30 objects):
-[
-  {
-    "day": 1,
-    "date": "YYYY-MM-DD",
-    "theme": "Weekly theme name",
-    "content_type": "educational",
-    "hook": "The attention-grabbing first line of this post",
-    "primary_platform": "instagram",
-    "all_platforms": ["instagram", "linkedin"],
-    "trend_used": "exact topic name from trending topics",
-    "content_idea": "2-3 sentence description of what this post covers",
-    "is_rest_day": false
-  }
-]`;
+RETURN THIS EXACT JSON STRUCTURE (an object containing "calendarDays" with exactly 30 objects covering day 1 through day 30):
+{
+  "calendarDays": [
+    {
+      "day": 1,
+      "date": "YYYY-MM-DD",
+      "theme": "Weekly theme name",
+      "content_type": "educational",
+      "hook": "The attention-grabbing first line of this post",
+      "primary_platform": "instagram",
+      "all_platforms": ["instagram"],
+      "trend_used": "exact topic name from trending topics",
+      "content_idea": "2-3 sentence description of what this post covers",
+      "is_rest_day": false
+    }
+  ]
+}`;
 }
 
 export function getCopywriterPrompt(

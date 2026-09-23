@@ -18,14 +18,14 @@ interface TrendsBadgesProps {
 }
 
 export default function TrendsBadges({ trends }: TrendsBadgesProps) {
-  if (!trends.length) return null;
+  if (!trends?.length) return null;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <TrendingUp className="w-4 h-4 text-violet-400" />
         <span className="text-sm font-medium text-muted-foreground">
-          {trends.length} Researched Trends
+          {trends?.length || 0} Researched Trends
         </span>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">

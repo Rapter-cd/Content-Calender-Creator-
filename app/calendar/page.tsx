@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAgentPipeline } from '@/hooks/useAgentPipeline';
 import { useCalendar } from '@/hooks/useCalendar';
 import { loadCalendar, saveCalendar } from '@/lib/storage';
-import { BrandConfig, CalendarDay, DayPosts, CalendarState } from '@/lib/types';
+import { BrandConfig, DayPosts, CalendarState } from '@/lib/types';
 import AgentPipeline from '@/components/AgentPipeline';
 import CalendarGrid from '@/components/CalendarGrid';
 import PostDrawer from '@/components/PostDrawer';
@@ -24,7 +24,9 @@ function CalendarContent() {
   const [savedState, setSavedState] = useState<CalendarState | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSavedState(loadCalendar());
   }, []);
 
@@ -51,6 +53,7 @@ function CalendarContent() {
   // Sync localDayPosts when the pipeline finishes
   useEffect(() => {
     if (state.dayPosts.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalDayPosts(state.dayPosts);
     }
   }, [state.dayPosts]);

@@ -230,7 +230,7 @@ export default function PlatformTabs({ dayPost, platforms, onUpdatePost }: Platf
   }, [localPosts, onUpdatePost]);
 
   // Sync when dayPost changes
-  if (!dayPost || !platforms.length) {
+  if (!dayPost || !platforms?.length) {
     return (
       <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground text-sm">
         <span className="text-2xl">📝</span>

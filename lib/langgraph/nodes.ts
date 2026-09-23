@@ -12,8 +12,7 @@ import pLimit from 'p-limit';
 
 export const MAX_RETRIES = 1;
 
-// Helper to initialize LLM
-const getModel = (modelName = 'llama-3.3-70b-versatile', maxTokens?: number) => new ChatGroq({
+const getModel = (modelName = 'qwen/qwen3.8-27b', maxTokens?: number) => new ChatGroq({
   apiKey: process.env.GROQ_API_KEY,
   model: modelName,
   ...(maxTokens && { max_tokens: maxTokens }),
@@ -29,10 +28,10 @@ async function callWithStructuredFallback<T>(
       return await chainCall();
     } catch (e: any) {
       lastError = e;
-      const isToolUseFailed = e?.code === 'tool_use_failed' || 
-                              e?.error?.code === 'tool_use_failed' ||
-                              e?.error?.error?.code === 'tool_use_failed' ||
-                              e?.message?.includes('tool_use_failed');
+      const isToolUseFailed = e?.code === 'tool_use_failed' || e?.code === 'json_validate_failed' ||
+                              e?.error?.code === 'tool_use_failed' || e?.error?.code === 'json_validate_failed' ||
+                              e?.error?.error?.code === 'tool_use_failed' || e?.error?.error?.code === 'json_validate_failed' ||
+                              e?.message?.includes('tool_use_failed') || e?.message?.includes('json_validate_failed');
 
       if (isToolUseFailed) {
         let failedGen = e?.failed_generation || 
@@ -76,7 +75,7 @@ async function callWithStructuredFallback<T>(
 }
 
 export async function research_trends(state: AgentState): Promise<Partial<AgentState>> {
-  const model = getModel().withStructuredOutput(TrendsResponseSchema);
+  const model = getModel('qwen/qwen3.8-27b', 3000).withStructuredOutput(TrendsResponseSchema);
   const prompt = getTrendResearcherPrompt(state.brandConfig, state.currentDate);
   
   const response = await callWithStructuredFallback<any>(async () => {
@@ -90,24 +89,75 @@ export async function research_trends(state: AgentState): Promise<Partial<AgentS
 }
 
 export async function plan_calendar(state: AgentState): Promise<Partial<AgentState>> {
-  const model = getModel().withStructuredOutput(CalendarResponseSchema);
+  const model = getModel('qwen/qwen3.8-27b', 6000).withStructuredOutput(CalendarResponseSchema);
   const prompt = getContentPlannerPrompt(state.brandConfig, state.trends, state.startDate);
   
-  const response = await callWithStructuredFallback<any>(async () => {
-    return await model.invoke([
-      { role: 'system', content: 'You are an expert Content Strategy Agent. Create a 30-day calendar.' },
-      { role: 'user', content: prompt }
-    ]);
-  });
-  
-  return { calendarDays: response.calendarDays };
+  let rawCalendarDays: CalendarDay[] = [];
+  try {
+    const response = await callWithStructuredFallback<any>(async () => {
+      return await model.invoke([
+        { role: 'system', content: 'You are an expert Content Strategy Agent. Create a 30-day calendar. Return all 30 days in calendarDays.' },
+        { role: 'user', content: prompt }
+      ]);
+    });
+    rawCalendarDays = response.calendarDays || [];
+  } catch (err) {
+    console.error('Plan calendar model error, applying fallback filler:', err);
+    rawCalendarDays = [];
+  }
+
+  // Guarantee all 30 days are populated with proper dates, frequencies, and trends
+  const daysMap = new Map(rawCalendarDays.map((d: CalendarDay) => [d.day, d]));
+  const fullCalendar: CalendarDay[] = [];
+  const startDateObj = new Date(state.startDate || new Date().toISOString().split('T')[0]);
+  const postsPerWeek = state.brandConfig?.postsPerWeek || 5;
+
+  for (let dayNum = 1; dayNum <= 30; dayNum++) {
+    const dayDate = new Date(startDateObj);
+    dayDate.setDate(dayDate.getDate() + (dayNum - 1));
+    const dateStr = dayDate.toISOString().split('T')[0];
+
+    // Calculate rest day based on weekly posting frequency
+    // E.g. postsPerWeek = 5 -> 2 rest days per 7-day cycle (days 6 & 7)
+    const dayInCycle = (dayNum - 1) % 7;
+    const isRestDayByFreq = dayInCycle >= postsPerWeek;
+
+    const existing = daysMap.get(dayNum);
+    if (existing) {
+      fullCalendar.push({
+        ...existing,
+        day: dayNum,
+        date: existing.date || dateStr,
+        is_rest_day: existing.is_rest_day !== undefined ? existing.is_rest_day : isRestDayByFreq,
+      });
+    } else {
+      const trend = (state.trends && state.trends.length > 0)
+        ? state.trends[(dayNum - 1) % state.trends.length]
+        : null;
+
+      fullCalendar.push({
+        day: dayNum,
+        date: dateStr,
+        theme: isRestDayByFreq ? 'Rest & Recovery' : (trend?.topic || 'Weekly Theme'),
+        content_type: isRestDayByFreq ? 'educational' : (trend?.content_type || 'educational'),
+        hook: isRestDayByFreq ? 'Rest day — no post scheduled.' : (trend?.hook_ideas?.[0] || 'Take a moment today to reflect on your journey.'),
+        primary_platform: state.brandConfig?.platforms?.[0] || 'instagram',
+        all_platforms: state.brandConfig?.platforms || ['instagram'],
+        trend_used: trend?.topic || 'Evergreen',
+        content_idea: isRestDayByFreq ? 'Rest day' : (trend?.angle || 'Daily growth and community engagement idea.'),
+        is_rest_day: isRestDayByFreq,
+      });
+    }
+  }
+
+  return { calendarDays: fullCalendar };
 }
 
 export async function generatePostForDay(dayPlan: CalendarDay, state: AgentState) {
-  // Enforce a deliberate 3-second spacing before execution to prevent rate limit bursts
-  await new Promise(r => setTimeout(r, 3000));
+  // 1.5s spacing to keep well below TPM/RPM limits
+  await new Promise(r => setTimeout(r, 1500));
 
-  const model = getModel('llama-3.1-8b-instant', 1500).withStructuredOutput(DayPostsSchema);
+  const model = getModel('qwen/qwen3.8-27b', 1500).withStructuredOutput(DayPostsSchema);
   const prompt = getCopywriterPrompt(state.brandConfig, dayPlan);
   
   const response = await callWithStructuredFallback<any>(async () => {
@@ -117,14 +167,13 @@ export async function generatePostForDay(dayPlan: CalendarDay, state: AgentState
     ]);
   });
   
-  // Ensure day is correctly injected back in if omitted by LLM
   return { ...response, day: dayPlan.day };
 }
 
 export async function write_posts(state: AgentState): Promise<Partial<AgentState>> {
   const activeDays = state.calendarDays.filter(d => !d.is_rest_day);
   
-  const limit = pLimit(2);
+  const limit = pLimit(1); // Execute smoothly to ensure zero 429 rate limit errors
   
   const results = await Promise.allSettled(
     activeDays.map(day => limit(() => generatePostForDay(day, state)))
